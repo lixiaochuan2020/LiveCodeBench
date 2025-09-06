@@ -1,9 +1,10 @@
 import os
 import json
+from datetime import datetime
 
 from lcb_runner.runner.parser import get_args
 from lcb_runner.utils.scenarios import Scenario
-from lcb_runner.lm_styles import LanguageModelStore
+from lcb_runner.lm_styles import LanguageModelStore, LMStyle, LanguageModel
 from lcb_runner.runner.runner_utils import build_runner
 from lcb_runner.utils.path_utils import get_output_path
 from lcb_runner.evaluation import extract_instance_results
@@ -18,8 +19,23 @@ from lcb_runner.runner.scenario_router import (
 def main():
     args = get_args()
 
-    model = LanguageModelStore[args.model]
+    # Get model from store or create dynamic model if not found
+    if args.model in LanguageModelStore:
+        model = LanguageModelStore[args.model]
+    else:
+        print(f"Model '{args.model}' not found in LanguageModelStore. Creating dynamic model.")
+        # Create a dynamic LanguageModel for models not in the predefined list
+        model = LanguageModel(
+            model_name=args.model,
+            model_repr=args.model,
+            model_style=LMStyle.OpenAIChat,  # Default to OpenAIChat style for local models
+            release_date=datetime.now(),
+            link=f"https://huggingface.co/{args.model}" if "/" in args.model else None,
+        )
+        # Add to store for potential future use in this session
+        LanguageModelStore[args.model] = model
     benchmark, format_prompt = build_prompt_benchmark(args)
+
     if args.debug:
         print(f"Running with {len(benchmark)} instances in debug mode")
         benchmark = benchmark[:15]
